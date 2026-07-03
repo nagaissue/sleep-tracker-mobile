@@ -1,89 +1,285 @@
-import { ScrollView, Text, View, TouchableOpacity } from "react-native";
-import { ScreenContainer } from "@/components/screen-container";
+import {
+  ScrollView,
+  View,
+  Text,
+  StyleSheet,
+  ActivityIndicator,
+} from "react-native";
+import { useState, useEffect, useCallback } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+import { Colors } from "@/lib/theme";
+import { checkApiConnection, API_BASE_URL } from "@/lib/api";
 
 export default function SettingsScreen() {
+  const insets = useSafeAreaInsets();
+  const [connectionStatus, setConnectionStatus] = useState<{
+    ok: boolean;
+    message: string;
+  } | null>(null);
+  const [checking, setChecking] = useState(true);
+
+  const checkConnection = useCallback(async () => {
+    setChecking(true);
+    const result = await checkApiConnection();
+    setConnectionStatus(result);
+    setChecking(false);
+  }, []);
+
+  useEffect(() => {
+    checkConnection();
+  }, [checkConnection]);
+
   return (
-    <ScreenContainer className="p-6">
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
-        <View className="flex-1 gap-6">
-          {/* Header */}
-          <View className="items-center gap-2">
-            <Text className="text-3xl font-bold text-foreground">設定</Text>
-          </View>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[
+        styles.content,
+        { paddingTop: insets.top + 16 },
+      ]}
+    >
+      {/* ヘッダー */}
+      <View style={styles.header}>
+        <Text style={styles.title}>設定</Text>
+      </View>
 
-          {/* Settings Sections */}
-          <View className="gap-4">
-            {/* Google Calendar Status */}
-            <View className="bg-surface rounded-2xl p-6 border border-border">
-              <Text className="text-base font-semibold text-foreground mb-3">
-                Google Calendar 連携
-              </Text>
-              <View className="flex-row items-center justify-between">
-                <Text className="text-sm text-muted">連携状態</Text>
-                <View className="bg-green-100 px-3 py-1 rounded-full">
-                  <Text className="text-xs font-semibold text-green-800">接続済み</Text>
-                </View>
+      {/* API接続状態 */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>API接続状態</Text>
+        <View style={styles.card}>
+          <View style={styles.row}>
+            <Text style={styles.rowLabel}>ステータス</Text>
+            {checking ? (
+              <View style={styles.statusRow}>
+                <ActivityIndicator size="small" color={Colors.primary} />
+                <Text style={styles.statusText}>確認中...</Text>
               </View>
-              <Text className="text-xs text-muted mt-3">
-                イベントは自動的にあなたのGoogleカレンダーに登録されます。
-              </Text>
-            </View>
-
-            {/* API Status */}
-            <View className="bg-surface rounded-2xl p-6 border border-border">
-              <Text className="text-base font-semibold text-foreground mb-3">
-                API設定
-              </Text>
-              <View className="gap-3">
-                <View className="flex-row items-center justify-between">
-                  <Text className="text-sm text-muted">Gemini API</Text>
-                  <View className="bg-green-100 px-3 py-1 rounded-full">
-                    <Text className="text-xs font-semibold text-green-800">有効</Text>
-                  </View>
-                </View>
-                <Text className="text-xs text-muted">
-                  自然言語解析に使用されます。
+            ) : connectionStatus ? (
+              <View
+                style={[
+                  styles.statusBadge,
+                  connectionStatus.ok
+                    ? { backgroundColor: Colors.successBg }
+                    : { backgroundColor: Colors.errorBg },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.statusBadgeText,
+                    connectionStatus.ok
+                      ? { color: "#166534" }
+                      : { color: "#991b1b" },
+                  ]}
+                >
+                  {connectionStatus.ok ? "✓ 接続OK" : "✗ 接続エラー"}
                 </Text>
               </View>
-            </View>
+            ) : null}
+          </View>
+          <Text style={styles.detailText}>
+            {connectionStatus?.message || ""}
+          </Text>
+        </View>
+      </View>
 
-            {/* App Info */}
-            <View className="bg-surface rounded-2xl p-6 border border-border">
-              <Text className="text-base font-semibold text-foreground mb-3">
-                アプリ情報
-              </Text>
-              <View className="gap-2">
-                <View className="flex-row justify-between">
-                  <Text className="text-sm text-muted">アプリ名</Text>
-                  <Text className="text-sm text-foreground font-medium">Sleep Tracker</Text>
-                </View>
-                <View className="flex-row justify-between">
-                  <Text className="text-sm text-muted">バージョン</Text>
-                  <Text className="text-sm text-foreground font-medium">1.0.0</Text>
-                </View>
-              </View>
-            </View>
+      {/* API エンドポイント */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>API エンドポイント</Text>
+        <View style={styles.card}>
+          <Text style={styles.detailText}>{API_BASE_URL}</Text>
+        </View>
+      </View>
 
-            {/* Help & Support */}
-            <View className="bg-blue-50 rounded-2xl p-6 border border-blue-200">
-              <Text className="text-base font-semibold text-blue-900 mb-3">
-                💡 ヒント
-              </Text>
-              <Text className="text-sm text-blue-800 leading-relaxed">
-                より正確な睡眠記録のために、「昨夜11時に就寝して今朝6時に起床した」のように、具体的な時刻を含めて話してください。
-              </Text>
+      {/* イベントカラー凡例 */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>イベントカラー</Text>
+        <View style={styles.card}>
+          <View style={styles.colorLegendRow}>
+            <View style={[styles.colorDot, { backgroundColor: Colors.sleep }]} />
+            <View style={styles.colorInfo}>
+              <Text style={styles.colorLabel}>就寝</Text>
+              <Text style={styles.colorDetail}>紺色 (colorId=9)</Text>
             </View>
           </View>
-
-          {/* Footer */}
-          <View className="mt-auto pt-6 border-t border-border">
-            <Text className="text-xs text-muted text-center">
-              Sleep Tracker App v1.0.0{"\n"}
-              © 2026 Sleep Tracker
-            </Text>
+          <View style={styles.divider} />
+          <View style={styles.colorLegendRow}>
+            <View style={[styles.colorDot, { backgroundColor: Colors.wake }]} />
+            <View style={styles.colorInfo}>
+              <Text style={styles.colorLabel}>起床</Text>
+              <Text style={styles.colorDetail}>オレンジ×黄 (colorId=6)</Text>
+            </View>
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.colorLegendRow}>
+            <View style={[styles.colorDot, { backgroundColor: Colors.nap }]} />
+            <View style={styles.colorInfo}>
+              <Text style={styles.colorLabel}>昼寝</Text>
+              <Text style={styles.colorDetail}>青色 (colorId=1)</Text>
+            </View>
           </View>
         </View>
-      </ScrollView>
-    </ScreenContainer>
+      </View>
+
+      {/* 技術スタック */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>技術スタック</Text>
+        <View style={styles.card}>
+          <View style={styles.row}>
+            <Text style={styles.rowLabel}>フロントエンド</Text>
+            <Text style={styles.rowValue}>Expo + React Native</Text>
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.row}>
+            <Text style={styles.rowLabel}>音声認識</Text>
+            <Text style={styles.rowValue}>expo-speech-recognition</Text>
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.row}>
+            <Text style={styles.rowLabel}>自然言語解析</Text>
+            <Text style={styles.rowValue}>Gemini 2.5 Flash</Text>
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.row}>
+            <Text style={styles.rowLabel}>カレンダー連携</Text>
+            <Text style={styles.rowValue}>Google Calendar API v3</Text>
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.row}>
+            <Text style={styles.rowLabel}>バックエンド</Text>
+            <Text style={styles.rowValue}>Python 3.12 (Vercel)</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* アプリ情報 */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>アプリ情報</Text>
+        <View style={styles.card}>
+          <View style={styles.row}>
+            <Text style={styles.rowLabel}>アプリ名</Text>
+            <Text style={styles.rowValue}>Sleep Tracker</Text>
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.row}>
+            <Text style={styles.rowLabel}>バージョン</Text>
+            <Text style={styles.rowValue}>1.0.0</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* フッター */}
+      <Text style={styles.footer}>
+        Sleep Tracker App v1.0.0{"\n"}© 2026 Sleep Tracker
+      </Text>
+    </ScrollView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  content: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  header: {
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: "bold",
+    color: Colors.text,
+  },
+  section: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: Colors.textMuted,
+    marginBottom: 8,
+    paddingLeft: 4,
+  },
+  card: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  row: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  rowLabel: {
+    fontSize: 15,
+    color: Colors.text,
+    fontWeight: "500",
+  },
+  rowValue: {
+    fontSize: 15,
+    color: Colors.textMuted,
+  },
+  statusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  statusText: {
+    fontSize: 14,
+    color: Colors.textMuted,
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusBadgeText: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  detailText: {
+    fontSize: 13,
+    color: Colors.textMuted,
+    marginTop: 8,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: Colors.border,
+    marginVertical: 12,
+  },
+  colorLegendRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  colorDot: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+  },
+  colorInfo: {
+    flex: 1,
+  },
+  colorLabel: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: Colors.text,
+  },
+  colorDetail: {
+    fontSize: 13,
+    color: Colors.textMuted,
+    marginTop: 2,
+  },
+  footer: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    textAlign: "center",
+    marginTop: 24,
+    lineHeight: 20,
+  },
+});

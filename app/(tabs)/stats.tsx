@@ -1,154 +1,342 @@
-import { ScrollView, Text, View } from "react-native";
-import { useState, useEffect } from "react";
-import { ScreenContainer } from "@/components/screen-container";
+import {
+  ScrollView,
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  RefreshControl,
+  ActivityIndicator,
+} from "react-native";
+import { useState, useEffect, useCallback } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-interface DailySleep {
-  date: string;
-  hours: number;
-}
-
-interface StatsData {
-  avgSleepHours: number | null;
-  napCount: number;
-  avgBedtime: string;
-  avgWaketime: string;
-  dailySleepHours: DailySleep[];
-}
+import { Colors } from "@/lib/theme";
+import { getStats, type StatsResponse } from "@/lib/api";
+import { SleepChart } from "@/components/SleepChart";
 
 export default function StatsScreen() {
-  const [stats, setStats] = useState<StatsData>({
-    avgSleepHours: null,
-    napCount: 0,
-    avgBedtime: "--:--",
-    avgWaketime: "--:--",
-    dailySleepHours: [],
-  });
+  const insets = useSafeAreaInsets();
+  const [stats, setStats] = useState<StatsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadStats = useCallback(async () => {
+    setError(null);
+    try {
+      const data = await getStats(7);
+      setStats(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "統計の取得に失敗しました");
+    } finally {
+      setIsLoading(false);
+      setRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => {
     loadStats();
-  }, []);
+  }, [loadStats]);
 
-  const loadStats = async () => {
-    setIsLoading(true);
-    try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Mock data for demo
-      const mockStats: StatsData = {
-        avgSleepHours: 7.2,
-        napCount: 2,
-        avgBedtime: "23:30",
-        avgWaketime: "06:45",
-        dailySleepHours: [
-          { date: "7/1", hours: 6.5 },
-          { date: "7/2", hours: 7.0 },
-          { date: "7/3", hours: 7.5 },
-          { date: "7/4", hours: 8.0 },
-          { date: "7/5", hours: 7.2 },
-          { date: "7/6", hours: 6.8 },
-          { date: "7/7", hours: 7.3 },
-        ],
-      };
-
-      setStats(mockStats);
-    } catch (error) {
-      console.error("Failed to load stats:", error);
-    } finally {
-      setIsLoading(false);
-    }
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadStats();
   };
 
-  const maxHours = Math.max(...stats.dailySleepHours.map((d) => d.hours), 10);
-
   return (
-    <ScreenContainer className="p-6">
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }}>
-        <View className="flex-1 gap-6">
-          {/* Header */}
-          <View className="items-center gap-2">
-            <Text className="text-3xl font-bold text-foreground">睡眠統計</Text>
-            <Text className="text-sm text-muted">過去7日間のデータ</Text>
-          </View>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[
+        styles.content,
+        { paddingTop: insets.top + 16 },
+      ]}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+    >
+      {/* ヘッダー */}
+      <View style={styles.header}>
+        <Text style={styles.title}>睡眠統計</Text>
+        <Text style={styles.subtitle}>過去7日間のデータ</Text>
+      </View>
 
-          {isLoading ? (
-            <View className="items-center justify-center py-12">
-              <Text className="text-base text-muted">統計を読み込み中...</Text>
+      {isLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.primary} />
+          <Text style={styles.loadingText}>統計を読み込み中...</Text>
+        </View>
+      ) : error ? (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>⚠ {error}</Text>
+          <TouchableOpacity onPress={loadStats} style={styles.retryButton}>
+            <Text style={styles.retryButtonText}>再試行</Text>
+          </TouchableOpacity>
+        </View>
+      ) : stats ? (
+        <>
+          {/* サマリーカード */}
+          <View style={styles.summarySection}>
+            {/* 平均睡眠時間 */}
+            <View style={styles.card}>
+              <Text style={styles.cardLabel}>平均睡眠時間</Text>
+              <Text style={styles.cardValueBig}>
+                {stats.avg_sleep_hours != null
+                  ? stats.avg_sleep_hours.toFixed(1)
+                  : "--"}
+                <Text style={styles.cardUnit}> 時間</Text>
+              </Text>
             </View>
-          ) : (
-            <>
-              {/* Key Stats */}
-              <View className="gap-3">
-                {/* Average Sleep */}
-                <View className="bg-surface rounded-2xl p-6 border border-border">
-                  <Text className="text-sm text-muted mb-1">平均睡眠時間</Text>
-                  <Text className="text-3xl font-bold text-foreground">
-                    {stats.avgSleepHours !== null ? `${stats.avgSleepHours.toFixed(1)}` : "--"}
-                    <Text className="text-lg"> 時間</Text>
-                  </Text>
-                </View>
 
-                {/* Nap Count */}
-                <View className="bg-surface rounded-2xl p-6 border border-border">
-                  <Text className="text-sm text-muted mb-1">昼寝の回数</Text>
-                  <Text className="text-3xl font-bold text-foreground">{stats.napCount}</Text>
-                </View>
+            {/* 昼寝回数 */}
+            <View style={styles.card}>
+              <Text style={styles.cardLabel}>昼寝の回数</Text>
+              <Text style={styles.cardValueBig}>{stats.nap_count}</Text>
+              {stats.nap_total_min > 0 && (
+                <Text style={styles.cardSubText}>
+                  合計 {stats.nap_total_min}分
+                </Text>
+              )}
+            </View>
 
-                {/* Bedtime & Waketime */}
-                <View className="flex-row gap-3">
-                  <View className="flex-1 bg-surface rounded-2xl p-6 border border-border">
-                    <Text className="text-sm text-muted mb-1">平均就寝時刻</Text>
-                    <Text className="text-2xl font-bold text-foreground">{stats.avgBedtime}</Text>
-                  </View>
-                  <View className="flex-1 bg-surface rounded-2xl p-6 border border-border">
-                    <Text className="text-sm text-muted mb-1">平均起床時刻</Text>
-                    <Text className="text-2xl font-bold text-foreground">{stats.avgWaketime}</Text>
-                  </View>
-                </View>
-              </View>
-
-              {/* Daily Sleep Chart */}
-              <View className="bg-surface rounded-2xl p-6 border border-border">
-                <Text className="text-base font-semibold text-foreground mb-4">日別睡眠時間</Text>
-
-                <View className="gap-4">
-                  {stats.dailySleepHours.map((day, index) => {
-                    const barHeight = (day.hours / maxHours) * 150;
-                    return (
-                      <View key={index} className="gap-2">
-                        <View className="flex-row items-end gap-3">
-                          <Text className="w-10 text-sm text-muted text-right">{day.date}</Text>
-                          <View
-                            style={{
-                              height: barHeight,
-                              backgroundColor: "#0a7ea4",
-                              borderRadius: 4,
-                              minHeight: 20,
-                            }}
-                            className="flex-1"
-                          />
-                          <Text className="w-12 text-sm text-foreground text-right">
-                            {day.hours.toFixed(1)}h
-                          </Text>
-                        </View>
-                      </View>
-                    );
-                  })}
-                </View>
-              </View>
-
-              {/* Info Card */}
-              <View className="bg-blue-50 rounded-2xl p-6 border border-blue-200">
-                <Text className="text-sm font-semibold text-blue-900 mb-2">💡 ヒント</Text>
-                <Text className="text-sm text-blue-800 leading-relaxed">
-                  健康的な睡眠時間は1日7～9時間です。毎日の睡眠パターンを記録することで、より良い睡眠習慣を形成できます。
+            {/* 就寝・起床時刻 */}
+            <View style={styles.rowCards}>
+              <View style={[styles.card, { flex: 1 }]}>
+                <Text style={styles.cardLabel}>平均就寝時刻</Text>
+                <Text style={styles.cardValue}>
+                  {stats.avg_bedtime || "--:--"}
                 </Text>
               </View>
-            </>
-          )}
-        </View>
-      </ScrollView>
-    </ScreenContainer>
+              <View style={[styles.card, { flex: 1 }]}>
+                <Text style={styles.cardLabel}>平均起床時刻</Text>
+                <Text style={styles.cardValue}>
+                  {stats.avg_waketime || "--:--"}
+                </Text>
+              </View>
+            </View>
+
+            {/* セッション数 */}
+            <View style={styles.card}>
+              <Text style={styles.cardLabel}>記録セッション数</Text>
+              <Text style={styles.cardValue}>
+                {stats.sleep_sessions} セッション / {stats.total_records}件
+              </Text>
+            </View>
+          </View>
+
+          {/* 日別睡眠時間チャート */}
+          <View style={styles.chartCard}>
+            <Text style={styles.chartTitle}>日別睡眠時間</Text>
+            <SleepChart sessions={stats.sleep_sessions_detail || []} />
+          </View>
+
+          {/* イベント内訳 */}
+          <View style={styles.card}>
+            <Text style={styles.cardLabel}>イベント内訳</Text>
+            <View style={styles.breakdownRow}>
+              <View style={styles.breakdownItem}>
+                <View
+                  style={[styles.breakdownDot, { backgroundColor: Colors.sleep }]}
+                />
+                <Text style={styles.breakdownText}>
+                  就寝 {stats.events_breakdown?.["就寝"] ?? 0}件
+                </Text>
+              </View>
+              <View style={styles.breakdownItem}>
+                <View
+                  style={[styles.breakdownDot, { backgroundColor: Colors.wake }]}
+                />
+                <Text style={styles.breakdownText}>
+                  起床 {stats.events_breakdown?.["起床"] ?? 0}件
+                </Text>
+              </View>
+              <View style={styles.breakdownItem}>
+                <View
+                  style={[styles.breakdownDot, { backgroundColor: Colors.nap }]}
+                />
+                <Text style={styles.breakdownText}>
+                  昼寝 {stats.events_breakdown?.["昼寝"] ?? 0}件
+                </Text>
+              </View>
+            </View>
+          </View>
+
+          {/* ヒント */}
+          <View style={styles.tipBox}>
+            <Text style={styles.tipTitle}>💡 ヒント</Text>
+            <Text style={styles.tipText}>
+              健康的な睡眠時間は1日7～9時間です。毎日の睡眠パターンを記録することで、より良い睡眠習慣を形成できます。
+            </Text>
+          </View>
+
+          {/* 更来ボタン */}
+          <TouchableOpacity
+            onPress={loadStats}
+            style={styles.refreshButton}
+          >
+            <Text style={styles.refreshButtonText}>データを更新</Text>
+          </TouchableOpacity>
+        </>
+      ) : null}
+    </ScrollView>
   );
 }
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: Colors.background,
+  },
+  content: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  header: {
+    alignItems: "center",
+    gap: 4,
+    marginBottom: 20,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: "bold",
+    color: Colors.text,
+  },
+  subtitle: {
+    fontSize: 14,
+    color: Colors.textMuted,
+  },
+  loadingContainer: {
+    alignItems: "center",
+    paddingVertical: 48,
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 15,
+    color: Colors.textMuted,
+  },
+  errorContainer: {
+    alignItems: "center",
+    paddingVertical: 48,
+    gap: 16,
+  },
+  errorText: {
+    fontSize: 15,
+    color: Colors.error,
+    textAlign: "center",
+  },
+  retryButton: {
+    backgroundColor: Colors.primary,
+    borderRadius: 20,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+  },
+  retryButtonText: {
+    color: "#fff",
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  summarySection: {
+    gap: 12,
+  },
+  card: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: Colors.border,
+  },
+  cardLabel: {
+    fontSize: 13,
+    color: Colors.textMuted,
+    marginBottom: 8,
+  },
+  cardValueBig: {
+    fontSize: 30,
+    fontWeight: "bold",
+    color: Colors.text,
+  },
+  cardUnit: {
+    fontSize: 16,
+    fontWeight: "normal",
+    color: Colors.textMuted,
+  },
+  cardValue: {
+    fontSize: 22,
+    fontWeight: "bold",
+    color: Colors.text,
+  },
+  cardSubText: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    marginTop: 4,
+  },
+  rowCards: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  chartCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    marginTop: 12,
+  },
+  chartTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: Colors.text,
+    marginBottom: 16,
+  },
+  breakdownRow: {
+    flexDirection: "row",
+    gap: 16,
+    marginTop: 4,
+  },
+  breakdownItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  breakdownDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  breakdownText: {
+    fontSize: 14,
+    color: Colors.text,
+  },
+  tipBox: {
+    backgroundColor: Colors.infoBg,
+    borderRadius: 16,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: Colors.info,
+    marginTop: 12,
+  },
+  tipTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#1e40af",
+    marginBottom: 8,
+  },
+  tipText: {
+    fontSize: 14,
+    color: "#1e40af",
+    lineHeight: 22,
+  },
+  refreshButton: {
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    borderRadius: 24,
+    paddingVertical: 14,
+    alignItems: "center",
+    marginTop: 16,
+  },
+  refreshButtonText: {
+    color: Colors.primary,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+});
