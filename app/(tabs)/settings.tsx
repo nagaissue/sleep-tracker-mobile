@@ -182,8 +182,8 @@ export default function SettingsScreen() {
           </View>
           <View style={styles.divider} />
           <View style={styles.row}>
-            <Text style={styles.rowLabel}>音声認識</Text>
-            <Text style={styles.rowValue}>expo-speech-recognition</Text>
+            <Text style={styles.rowLabel}>テキスト入力</Text>
+            <Text style={styles.rowValue}>TextInput（日本語対応）</Text>
           </View>
           <View style={styles.divider} />
           <View style={styles.row}>
@@ -214,14 +214,14 @@ export default function SettingsScreen() {
           <View style={styles.divider} />
           <View style={styles.row}>
             <Text style={styles.rowLabel}>バージョン</Text>
-            <Text style={styles.rowValue}>2.0.0</Text>
+            <Text style={styles.rowValue}>2.1.0</Text>
           </View>
         </View>
       </View>
 
       {/* フッター */}
       <Text style={styles.footer}>
-        Sleep Tracker App v2.0.0{"\n"}© 2026 Sleep Tracker
+        Sleep Tracker App v2.1.0{"\n"}© 2026 Sleep Tracker
       </Text>
     </ScrollView>
   );

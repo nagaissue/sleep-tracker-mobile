@@ -2,7 +2,7 @@
   "expo": {
     "name": "Sleep Tracker",
     "slug": "sleep-tracker-mobile",
-    "version": "1.0.0",
+    "version": "2.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "sleeptracker",
@@ -10,11 +10,7 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.app.sleeptracker",
-      "infoPlist": {
-        "NSMicrophoneUsageDescription": "睡眠記録のための音声入力にマイクを使用します。",
-        "NSSpeechRecognitionUsageDescription": "音声認識で睡眠記録を入力します。"
-      }
+      "bundleIdentifier": "com.app.sleeptracker"
     },
     "android": {
       "adaptiveIcon": {
@@ -24,7 +20,7 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "package": "com.app.sleeptracker",
-      "permissions": ["RECORD_AUDIO", "INTERNET"]
+      "permissions": ["INTERNET"]
     },
     "web": {
       "bundler": "metro",
@@ -33,13 +29,6 @@
     },
     "plugins": [
       "expo-router",
-      [
-        "expo-speech-recognition",
-        {
-          "microphonePermission": "睡眠記録のための音声入力にマイクを使用します。",
-          "speechRecognitionPermission": "音声認識で睡眠記録を入力します。"
-        }
-      ],
       [
         "expo-splash-screen",
         {

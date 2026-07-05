@@ -5,12 +5,13 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { useState, useEffect, useCallback } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Colors, EventColors } from "@/lib/theme";
-import { getMonthRecords, type SleepRecord } from "@/lib/storage";
+import { getMonthRecords, deleteRecord, type SleepRecord } from "@/lib/storage";
 
 const WEEKDAYS = ["日", "月", "火", "水", "木", "金", "土"];
 const MONTHS = [
@@ -62,6 +63,25 @@ export default function CalendarScreen() {
       setMonth(month + 1);
     }
     setSelectedDay(null);
+  };
+
+  // ── 個別削除 ──────────────────────────────────────────
+  const handleDelete = (record: SleepRecord) => {
+    Alert.alert(
+      "記録を削除",
+      `${record.type} — ${formatTime(new Date(record.datetime))} の記録を削除しますか？`,
+      [
+        { text: "キャンセル", style: "cancel" },
+        {
+          text: "削除",
+          style: "destructive",
+          onPress: async () => {
+            await deleteRecord(record.id);
+            await loadRecords();
+          },
+        },
+      ]
+    );
   };
 
   // ── カレンダーグリッドの構築 ────────────────────────
@@ -209,7 +229,7 @@ export default function CalendarScreen() {
                   .sort((a, b) => a.datetime.localeCompare(b.datetime))
                   .map((r, i) => {
                     const dt = new Date(r.datetime);
-                    const time = `${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")}`;
+                    const time = formatTime(dt);
                     return (
                       <View key={r.id || i} style={styles.detailRow}>
                         <View
@@ -217,9 +237,15 @@ export default function CalendarScreen() {
                         />
                         <Text style={styles.detailType}>{r.type}</Text>
                         <Text style={styles.detailTime}>{time}</Text>
-                        {r.duration_min && (
+                        {r.duration_min ? (
                           <Text style={styles.detailDuration}>({r.duration_min}分)</Text>
-                        )}
+                        ) : null}
+                        <TouchableOpacity
+                          onPress={() => handleDelete(r)}
+                          style={styles.deleteButton}
+                        >
+                          <Text style={styles.deleteButtonText}>✕</Text>
+                        </TouchableOpacity>
                       </View>
                     );
                   })
@@ -254,6 +280,14 @@ export default function CalendarScreen() {
     </ScrollView>
   );
 }
+
+// ── ユーティリティ ──────────────────────────────────────
+
+function formatTime(dt: Date): string {
+  return `${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")}`;
+}
+
+// ── スタイル ────────────────────────────────────────────
 
 const styles = StyleSheet.create({
   container: {
@@ -364,7 +398,7 @@ const styles = StyleSheet.create({
   detailCard: {
     backgroundColor: Colors.surface,
     borderRadius: 16,
-    padding: 18,
+    padding: 16,
     borderWidth: 1,
     borderColor: Colors.border,
     marginTop: 16,
@@ -379,8 +413,8 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    paddingVertical: 8,
-    borderBottomWidth: 0.5,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
     borderBottomColor: Colors.border,
   },
   detailDot: {
@@ -392,29 +426,44 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "500",
     color: Colors.text,
-    minWidth: 50,
+    minWidth: 40,
   },
   detailTime: {
     fontSize: 15,
-    color: Colors.textMuted,
+    color: Colors.text,
+    fontWeight: "600",
   },
   detailDuration: {
     fontSize: 13,
     color: Colors.textMuted,
   },
+  deleteButton: {
+    marginLeft: "auto",
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: Colors.errorBg,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  deleteButtonText: {
+    color: Colors.error,
+    fontSize: 14,
+    fontWeight: "700",
+  },
   emptyDetail: {
     fontSize: 14,
     color: Colors.textMuted,
     textAlign: "center",
-    paddingVertical: 12,
+    paddingVertical: 16,
   },
   legendCard: {
     flexDirection: "row",
     justifyContent: "center",
     gap: 24,
     backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: 14,
+    borderRadius: 16,
+    padding: 16,
     borderWidth: 1,
     borderColor: Colors.border,
     marginTop: 16,
@@ -422,7 +471,7 @@ const styles = StyleSheet.create({
   legendRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
+    gap: 8,
   },
   legendDot: {
     width: 10,
@@ -432,11 +481,12 @@ const styles = StyleSheet.create({
   legendText: {
     fontSize: 14,
     color: Colors.text,
+    fontWeight: "500",
   },
   recordCount: {
     fontSize: 13,
     color: Colors.textMuted,
     textAlign: "center",
-    marginTop: 12,
+    marginTop: 16,
   },
 });

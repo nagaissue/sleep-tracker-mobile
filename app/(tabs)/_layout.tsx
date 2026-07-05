@@ -33,7 +33,7 @@ export default function TabLayout() {
         options={{
           title: "記録",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="mic" size={size} color={color} />
+            <Ionicons name="create-outline" size={size} color={color} />
           ),
         }}
       />

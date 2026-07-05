@@ -4,7 +4,6 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  Pressable,
   StyleSheet,
   Keyboard,
   ActivityIndicator,
@@ -12,8 +11,6 @@ import {
 import { useState, useCallback } from "react";
 import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
-import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from "expo-speech-recognition";
 
 import { Colors, EventColors } from "@/lib/theme";
 import { parseText, type SleepEvent } from "@/lib/api";
@@ -24,48 +21,11 @@ type StatusType = "info" | "success" | "error";
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
 
-  const [isRecording, setIsRecording] = useState(false);
-  const [transcript, setTranscript] = useState("");
   const [textInput, setTextInput] = useState("");
   const [parsedEvents, setParsedEvents] = useState<SleepEvent[]>([]);
   const [statusMsg, setStatusMsg] = useState("");
   const [statusType, setStatusType] = useState<StatusType>("info");
   const [isLoading, setIsLoading] = useState(false);
-  const [speechAvailable, setSpeechAvailable] = useState(true);
-
-  // ── 音声認識イベントハンドラ ──────────────────────────
-  useSpeechRecognitionEvent("result", (event) => {
-    const text = event.results.map((r) => r.transcript).join("");
-    setTranscript(text);
-    if (event.isFinal) {
-      setIsRecording(false);
-      handleParse(text);
-    }
-  });
-
-  useSpeechRecognitionEvent("start", () => {
-    setIsRecording(true);
-  });
-
-  useSpeechRecognitionEvent("end", () => {
-    setIsRecording(false);
-  });
-
-  useSpeechRecognitionEvent("error", (event) => {
-    setIsRecording(false);
-    const code = event.error;
-    if (code === "service-not-allowed" || code === "language-not-supported") {
-      setSpeechAvailable(false);
-      showStatus("音声認識が利用できません。テキスト入力をご利用ください。", "error");
-    } else if (code === "not-allowed") {
-      setSpeechAvailable(false);
-      showStatus("マイクへのアクセス許可が必要です", "error");
-    } else if (code === "no-speech" || code === "speech-timeout") {
-      showStatus("音声が検出されませんでした。もう一度お試しください。", "error");
-    } else {
-      showStatus(`音声認識エラー: ${code}`, "error");
-    }
-  });
 
   // ── ヘルパー関数 ──────────────────────────────────────
   const showStatus = useCallback((msg: string, type: StatusType = "info") => {
@@ -73,40 +33,11 @@ export default function HomeScreen() {
     setStatusType(type);
   }, []);
 
-  // ── 音声入力 ──────────────────────────────────────────
-  const handleMicPress = async () => {
-    if (isRecording) {
-      ExpoSpeechRecognitionModule.stop();
-      return;
-    }
-
-    try {
-      const { granted } = await ExpoSpeechRecognitionModule.requestPermissionsAsync();
-      if (!granted) {
-        showStatus("マイクへのアクセス許可が必要です", "error");
-        return;
-      }
-      setTranscript("");
-      setParsedEvents([]);
-      setStatusMsg("");
-      Keyboard.dismiss();
-      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-      ExpoSpeechRecognitionModule.start({
-        lang: "ja-JP",
-        interimResults: true,
-      });
-    } catch {
-      setSpeechAvailable(false);
-      showStatus("音声認識を開始できません。テキスト入力をご利用ください。", "error");
-    }
-  };
-
   // ── テキスト入力から解析 ──────────────────────────────
   const handleTextParse = async () => {
     const text = textInput.trim();
     if (!text) return;
     Keyboard.dismiss();
-    setTranscript(text);
     await handleParse(text);
   };
 
@@ -150,7 +81,6 @@ export default function HomeScreen() {
         "success"
       );
       setParsedEvents([]);
-      setTranscript("");
       setTextInput("");
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err) {
@@ -166,7 +96,6 @@ export default function HomeScreen() {
 
   const handleClear = () => {
     setParsedEvents([]);
-    setTranscript("");
     setTextInput("");
     setStatusMsg("");
   };
@@ -254,35 +183,10 @@ export default function HomeScreen() {
       {/* ヘッダー */}
       <View style={styles.header}>
         <Text style={styles.title}>😴 Sleep Tracker</Text>
-        <Text style={styles.subtitle}>音声またはテキストで睡眠を記録</Text>
+        <Text style={styles.subtitle}>テキスト入力で睡眠を記録</Text>
       </View>
 
-      {/* マイクボタン */}
-      <View style={styles.micContainer}>
-        <Pressable
-          onPress={handleMicPress}
-          disabled={isLoading || !speechAvailable}
-          style={({ pressed }) => [
-            styles.micButton,
-            {
-              backgroundColor: isRecording ? Colors.error : Colors.primary,
-              opacity: !speechAvailable || isLoading ? 0.4 : pressed ? 0.85 : 1,
-              transform: [{ scale: pressed ? 0.95 : 1 }],
-            },
-          ]}
-        >
-          <Text style={styles.micIcon}>{isRecording ? "⏹" : "🎤"}</Text>
-        </Pressable>
-        <Text style={styles.micLabel}>
-          {!speechAvailable
-            ? "音声認識非対応（テキスト入力をご利用ください）"
-            : isRecording
-              ? "話しています...（タップで停止）"
-              : "タップして話す"}
-        </Text>
-      </View>
-
-      {/* テキスト入力（フォールバック） */}
+      {/* テキスト入力 */}
       <View style={styles.textInputContainer}>
         <TextInput
           style={styles.textInput}
@@ -292,6 +196,7 @@ export default function HomeScreen() {
           onChangeText={setTextInput}
           onSubmitEditing={handleTextParse}
           editable={!isLoading}
+          multiline
         />
         <TouchableOpacity
           onPress={handleTextParse}
@@ -304,14 +209,6 @@ export default function HomeScreen() {
           <Text style={styles.parseButtonText}>解析</Text>
         </TouchableOpacity>
       </View>
-
-      {/* 音声認識結果 */}
-      {transcript ? (
-        <View style={styles.transcriptBox}>
-          <Text style={styles.transcriptLabel}>認識されたテキスト:</Text>
-          <Text style={styles.transcriptText}>{transcript}</Text>
-        </View>
-      ) : null}
 
       {/* ステータスメッセージ */}
       {statusMsg ? (
@@ -402,25 +299,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: Colors.textMuted,
   },
-  micContainer: {
-    alignItems: "center",
-    gap: 12,
-    marginBottom: 24,
-  },
-  micButton: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  micIcon: {
-    fontSize: 32,
-  },
-  micLabel: {
-    fontSize: 14,
-    color: Colors.textMuted,
-  },
   textInputContainer: {
     flexDirection: "row",
     gap: 8,
@@ -436,6 +314,7 @@ const styles = StyleSheet.create({
     color: Colors.text,
     borderWidth: 1,
     borderColor: Colors.border,
+    minHeight: 48,
   },
   parseButton: {
     backgroundColor: Colors.primary,
@@ -447,23 +326,6 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 15,
     fontWeight: "600",
-  },
-  transcriptBox: {
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginBottom: 12,
-  },
-  transcriptLabel: {
-    fontSize: 12,
-    color: Colors.textMuted,
-    marginBottom: 6,
-  },
-  transcriptText: {
-    fontSize: 15,
-    color: Colors.text,
   },
   statusBox: {
     borderRadius: 12,
