@@ -11,12 +11,12 @@ import { useState, useEffect, useCallback } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { Colors } from "@/lib/theme";
-import { getStats, type StatsResponse } from "@/lib/api";
+import { computeStats, type StatsData } from "@/lib/stats";
 import { SleepChart } from "@/components/SleepChart";
 
 export default function StatsScreen() {
   const insets = useSafeAreaInsets();
-  const [stats, setStats] = useState<StatsResponse | null>(null);
+  const [stats, setStats] = useState<StatsData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -24,7 +24,7 @@ export default function StatsScreen() {
   const loadStats = useCallback(async () => {
     setError(null);
     try {
-      const data = await getStats(7);
+      const data = await computeStats(7);
       setStats(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : "統計の取得に失敗しました");
@@ -63,7 +63,7 @@ export default function StatsScreen() {
       {isLoading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={Colors.primary} />
-          <Text style={styles.loadingText}>統計を読み込み中...</Text>
+          <Text style={styles.loadingText}>統計を計算中...</Text>
         </View>
       ) : error ? (
         <View style={styles.errorContainer}>
@@ -168,7 +168,7 @@ export default function StatsScreen() {
             </Text>
           </View>
 
-          {/* 更来ボタン */}
+          {/* 更新ボタン */}
           <TouchableOpacity
             onPress={loadStats}
             style={styles.refreshButton}

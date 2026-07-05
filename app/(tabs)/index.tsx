@@ -16,11 +16,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ExpoSpeechRecognitionModule, useSpeechRecognitionEvent } from "expo-speech-recognition";
 
 import { Colors, EventColors } from "@/lib/theme";
-import {
-  parseText,
-  registerToCalendar,
-  type SleepEvent,
-} from "@/lib/api";
+import { parseText, type SleepEvent } from "@/lib/api";
+import { saveRecords } from "@/lib/storage";
 
 type StatusType = "info" | "success" | "error";
 
@@ -135,15 +132,21 @@ export default function HomeScreen() {
     }
   };
 
-  // ── Google Calendar に登録 ────────────────────────────
+  // ── ローカルストレージに保存 ──────────────────────────
   const handleRegister = async () => {
     if (parsedEvents.length === 0) return;
-    showStatus("Googleカレンダーに登録中...", "info");
+    showStatus("アプリ内に保存中...", "info");
     setIsLoading(true);
     try {
-      const result = await registerToCalendar(parsedEvents);
+      const saved = await saveRecords(
+        parsedEvents.map((ev) => ({
+          type: ev.type,
+          datetime: ev.datetime,
+          duration_min: ev.duration_min,
+        }))
+      );
       showStatus(
-        `✅ ${result.created.length}件のイベントを登録しました！`,
+        `✅ ${saved.length}件のイベントを保存しました！`,
         "success"
       );
       setParsedEvents([]);
@@ -152,7 +155,7 @@ export default function HomeScreen() {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch (err) {
       showStatus(
-        `登録エラー: ${err instanceof Error ? err.message : "不明なエラー"}`,
+        `保存エラー: ${err instanceof Error ? err.message : "不明なエラー"}`,
         "error"
       );
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -320,9 +323,6 @@ export default function HomeScreen() {
             statusType === "info" && { backgroundColor: Colors.infoBg, borderColor: Colors.info },
           ]}
         >
-          {isLoading ? (
-            <ActivityIndicator size="small" color={Colors.primary} style={{ marginRight: 8 }} />
-          ) : null}
           <Text
             style={[
               styles.statusText,
@@ -336,45 +336,31 @@ export default function HomeScreen() {
         </View>
       ) : null}
 
-      {/* イベントプレビュー */}
-      {parsedEvents.length > 0 ? (
-        <View style={styles.previewSection}>
-          <Text style={styles.previewTitle}>検出されたイベント:</Text>
-          {renderEventPreview()}
-
-          {/* アクションボタン */}
-          <View style={styles.actionButtons}>
-            <TouchableOpacity
-              onPress={handleRegister}
-              disabled={isLoading}
-              style={[styles.registerButton, isLoading && { opacity: 0.5 }]}
-            >
-              <Text style={styles.registerButtonText}>
-                {isLoading ? "登録中..." : "カレンダーに登録"}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={handleClear}
-              disabled={isLoading}
-              style={styles.cancelButton}
-            >
-              <Text style={styles.cancelButtonText}>キャンセル</Text>
-            </TouchableOpacity>
-          </View>
+      {/* ローディング */}
+      {isLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={Colors.primary} />
         </View>
       ) : null}
 
-      {/* 使い方ガイド */}
-      {parsedEvents.length === 0 && !transcript && !statusMsg ? (
-        <View style={styles.guideBox}>
-          <Text style={styles.guideTitle}>使い方</Text>
-          <Text style={styles.guideText}>
-            1. マイクボタンをタップして話す{"\n"}
-            2. 「昨夜11時に就寝して今朝6時に起床した」のように話す{"\n"}
-            3. テキスト入力も可能（音声認識未対応環境用）{"\n"}
-            4. イベントが自動で検出されます{"\n"}
-            5. 「カレンダーに登録」をタップして保存
-          </Text>
+      {/* イベントプレビュー */}
+      {renderEventPreview()}
+
+      {/* 登録・クリアボタン */}
+      {parsedEvents.length > 0 && !isLoading ? (
+        <View style={styles.actionButtons}>
+          <TouchableOpacity
+            onPress={handleRegister}
+            style={[styles.registerButton, { backgroundColor: Colors.primary }]}
+          >
+            <Text style={styles.registerButtonText}>アプリ内に保存</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={handleClear}
+            style={[styles.registerButton, { backgroundColor: Colors.surface, borderWidth: 1, borderColor: Colors.border }]}
+          >
+            <Text style={[styles.registerButtonText, { color: Colors.textMuted }]}>クリア</Text>
+          </TouchableOpacity>
         </View>
       ) : null}
     </ScrollView>
@@ -382,15 +368,17 @@ export default function HomeScreen() {
 }
 
 // ── ユーティリティ ──────────────────────────────────────
+
 function formatDateTime(dt: Date): string {
-  const M = dt.getMonth() + 1;
-  const D = dt.getDate();
-  const H = String(dt.getHours()).padStart(2, "0");
-  const m = String(dt.getMinutes()).padStart(2, "0");
-  return `${M}/${D} ${H}:${m}`;
+  const m = String(dt.getMonth() + 1).padStart(2, "0");
+  const d = String(dt.getDate()).padStart(2, "0");
+  const h = String(dt.getHours()).padStart(2, "0");
+  const min = String(dt.getMinutes()).padStart(2, "0");
+  return `${m}/${d} ${h}:${min}`;
 }
 
 // ── スタイル ────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -402,38 +390,36 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: "center",
-    gap: 6,
-    marginBottom: 8,
+    gap: 4,
+    marginBottom: 24,
   },
   title: {
-    fontSize: 32,
+    fontSize: 28,
     fontWeight: "bold",
     color: Colors.text,
   },
   subtitle: {
     fontSize: 14,
     color: Colors.textMuted,
-    textAlign: "center",
   },
   micContainer: {
     alignItems: "center",
-    paddingVertical: 24,
     gap: 12,
+    marginBottom: 24,
   },
   micButton: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    justifyContent: "center",
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     alignItems: "center",
+    justifyContent: "center",
   },
   micIcon: {
-    fontSize: 36,
+    fontSize: 32,
   },
   micLabel: {
-    fontSize: 13,
+    fontSize: 14,
     color: Colors.textMuted,
-    textAlign: "center",
   },
   textInputContainer: {
     flexDirection: "row",
@@ -442,19 +428,19 @@ const styles = StyleSheet.create({
   },
   textInput: {
     flex: 1,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    backgroundColor: Colors.surface,
     borderRadius: 12,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 12,
     fontSize: 15,
     color: Colors.text,
-    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   parseButton: {
     backgroundColor: Colors.primary,
     borderRadius: 12,
-    paddingHorizontal: 18,
+    paddingHorizontal: 20,
     justifyContent: "center",
   },
   parseButtonText: {
@@ -464,8 +450,8 @@ const styles = StyleSheet.create({
   },
   transcriptBox: {
     backgroundColor: Colors.surface,
-    borderRadius: 14,
-    padding: 14,
+    borderRadius: 12,
+    padding: 16,
     borderWidth: 1,
     borderColor: Colors.border,
     marginBottom: 12,
@@ -480,9 +466,7 @@ const styles = StyleSheet.create({
     color: Colors.text,
   },
   statusBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 14,
+    borderRadius: 12,
     padding: 14,
     borderWidth: 1,
     marginBottom: 12,
@@ -490,25 +474,21 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 14,
     fontWeight: "500",
-    flex: 1,
   },
-  previewSection: {
-    gap: 12,
-  },
-  previewTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: Colors.text,
+  loadingContainer: {
+    alignItems: "center",
+    paddingVertical: 20,
   },
   eventsContainer: {
     gap: 10,
+    marginBottom: 16,
   },
   eventCard: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
     backgroundColor: Colors.surface,
-    borderRadius: 14,
+    borderRadius: 12,
     padding: 14,
     borderWidth: 1,
     borderColor: Colors.border,
@@ -522,21 +502,21 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   eventTypeText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "600",
     color: Colors.text,
   },
   eventTimeText: {
-    fontSize: 14,
+    fontSize: 13,
     color: Colors.textMuted,
     marginTop: 2,
   },
   actionButtons: {
-    gap: 10,
-    marginTop: 8,
+    flexDirection: "row",
+    gap: 12,
   },
   registerButton: {
-    backgroundColor: Colors.primary,
+    flex: 1,
     borderRadius: 24,
     paddingVertical: 14,
     alignItems: "center",
@@ -545,37 +525,5 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "600",
-  },
-  cancelButton: {
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    borderRadius: 24,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  cancelButtonText: {
-    color: Colors.text,
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  guideBox: {
-    backgroundColor: Colors.surface,
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    marginTop: 16,
-  },
-  guideTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: Colors.text,
-    marginBottom: 10,
-  },
-  guideText: {
-    fontSize: 14,
-    color: Colors.textMuted,
-    lineHeight: 22,
   },
 });

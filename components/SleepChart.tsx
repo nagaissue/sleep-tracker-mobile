@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet } from "react-native";
 import { Colors } from "@/lib/theme";
-import type { SleepSessionDetail } from "@/lib/api";
+import type { SleepSessionDetail } from "@/lib/stats";
 
 interface SleepChartProps {
   sessions: SleepSessionDetail[];

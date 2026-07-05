@@ -1,5 +1,8 @@
 /**
  * テーマ・カラー定数
+ *
+ * Google Calendar colorIdとの対応は廃止。
+ * アプリ内で独自のカラーマッピングを管理。
  */
 
 export const Colors = {
@@ -17,10 +20,10 @@ export const Colors = {
   errorBg: "#fef2f2",
   info: "#3b82f6",
   infoBg: "#eff6ff",
-  // イベントカラー（Google Calendar colorId に対応）
-  sleep: "#1e3a8a", // 紺色 (colorId=9)
-  wake: "#f97316", // オレンジ×黄 (colorId=6)
-  nap: "#3b82f6", // 青色 (colorId=1)
+  // イベントカラー（アプリ内独自定義）
+  sleep: "#1e3a8a", // 紺色
+  wake: "#f97316", // オレンジ×黄
+  nap: "#3b82f6",  // 青色
 };
 
 export const EventColors: Record<string, string> = {
