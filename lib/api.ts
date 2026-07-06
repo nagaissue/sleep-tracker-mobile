@@ -2,7 +2,8 @@
  * API クライアント — Vercel上のバックエンドAPIと通信
  *
  * エンドポイント:
- *   POST /api/parse    — Gemini 2.5 Flash でテキスト解析（のみ使用）
+ *   POST /api/parse    — Gemini 2.5 Flash でテキスト解析（就寝/昼寝/起床 + 時刻の抽出）
+ *   POST /api/analyze  — Gemini 2.5 Flash で睡眠記録全体を分析（指標算出・気づき・提案）
  *
  * ※ Google Calendar API連携は廃止し、アプリ内ローカルストレージで管理
  */
@@ -25,10 +26,27 @@ export interface ParseResponse {
   events: SleepEvent[];
 }
 
+export interface SleepMetrics {
+  avg_sleep_hours: number | null;
+  avg_bedtime: string | null;
+  avg_waketime: string | null;
+  sleep_consistency_score: number | null;
+  total_nap_count: number;
+  sleep_debt_hours: number | null;
+}
+
+export interface SleepAnalysis {
+  metrics: SleepMetrics;
+  summary: string;
+  insights: string[];
+  recommendations: string[];
+}
+
 // ── API 関数 ────────────────────────────────────────────
 
 /**
  * テキストをGemini 2.5 Flashで解析し、睡眠イベントを抽出する
+ * 入力フォーマットは「カテゴリー（就寝/昼寝/起床）＋時刻（0:00〜23:59）」で固定。
  */
 export async function parseText(text: string): Promise<ParseResponse> {
   const res = await fetch(`${API_BASE_URL}/api/parse`, {
@@ -39,6 +57,23 @@ export async function parseText(text: string): Promise<ParseResponse> {
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || "解析エラーが発生しました");
   return data as ParseResponse;
+}
+
+/**
+ * 睡眠記録一式をGemini 2.5 Flashに送り、睡眠指標の算出と分析コメントを取得する
+ */
+export async function analyzeSleep(
+  records: { type: string; datetime: string }[]
+): Promise<SleepAnalysis> {
+  const res = await fetch(`${API_BASE_URL}/api/analyze`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ records }),
+    signal: AbortSignal.timeout(30000),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || "分析エラーが発生しました");
+  return data as SleepAnalysis;
 }
 
 /**

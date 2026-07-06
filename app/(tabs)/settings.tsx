@@ -214,14 +214,14 @@ export default function SettingsScreen() {
           <View style={styles.divider} />
           <View style={styles.row}>
             <Text style={styles.rowLabel}>バージョン</Text>
-            <Text style={styles.rowValue}>2.1.0</Text>
+            <Text style={styles.rowValue}>2.2.0</Text>
           </View>
         </View>
       </View>
 
       {/* フッター */}
       <Text style={styles.footer}>
-        Sleep Tracker App v2.1.0{"\n"}© 2026 Sleep Tracker
+        Sleep Tracker App v2.2.0{"\n"}© 2026 Sleep Tracker
       </Text>
     </ScrollView>
   );

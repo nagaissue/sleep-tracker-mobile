@@ -183,14 +183,14 @@ export default function HomeScreen() {
       {/* ヘッダー */}
       <View style={styles.header}>
         <Text style={styles.title}>😴 Sleep Tracker</Text>
-        <Text style={styles.subtitle}>テキスト入力で睡眠を記録</Text>
+        <Text style={styles.subtitle}>「就寝」「昼寝」「起床」＋時刻で記録</Text>
       </View>
 
       {/* テキスト入力 */}
       <View style={styles.textInputContainer}>
         <TextInput
           style={styles.textInput}
-          placeholder="例: 昨夜11時に就寝して今朝6時半に起床した"
+          placeholder="例: 23:00に就寝、5:00に起床"
           placeholderTextColor={Colors.textMuted}
           value={textInput}
           onChangeText={setTextInput}
@@ -208,6 +208,13 @@ export default function HomeScreen() {
         >
           <Text style={styles.parseButtonText}>解析</Text>
         </TouchableOpacity>
+      </View>
+
+      {/* 入力フォーマットの案内 */}
+      <View style={styles.formatHint}>
+        <Text style={styles.formatHintText}>
+          「カテゴリー（就寝・昼寝・起床）」と「時刻（0:00〜23:59）」で入力してください
+        </Text>
       </View>
 
       {/* ステータスメッセージ */}
@@ -326,6 +333,14 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 15,
     fontWeight: "600",
+  },
+  formatHint: {
+    marginBottom: 12,
+    paddingHorizontal: 4,
+  },
+  formatHintText: {
+    fontSize: 12,
+    color: Colors.textMuted,
   },
   statusBox: {
     borderRadius: 12,
